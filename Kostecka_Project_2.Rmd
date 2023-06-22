@@ -1,0 +1,469 @@
+---
+title: "Kostecka_Project_2"
+author: "Charlotte Kostecka"
+date:  "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    code_folding: show
+    csl: biomed-central.csl
+    df_print: paged
+    fig_caption: yes
+    fig_height: 6
+    fig_width: 7
+    number_sections: yes
+    theme: journal
+    toc: yes
+    toc_float: yes
+  word_document:
+    toc: yes
+    toc_depth: 4
+  pdf_document:
+    df_print: kable
+    fig_caption: yes
+    fig_height: 6
+    fig_width: 7
+    highlight: tango
+    toc: yes
+    toc_depth: 4
+bibliography: project.bib
+abstract: This project is all about applications of SLR to real data using R. I use the simple linear regression model and method of least squares to fit a linear and a quadratic model to an astrophysics data set. The data set is from a paper that uses a linear regression to study the proposed relationship between beryllium levels in stars and if they are planet-hosting or not. I am anlyzing if a linear trendline was the best fit to define the relationship between beryllium and temperature in this paper. Through my analysis, I have determined that neither a linear nor a quadratic model are a good fit for this data set. Once outliers are removed, the two models have roughly the same $R^2$ values at around 0.3. The data set must be looked at in more detail to determine which points can be removed without altering the data set too much and the regressions re-run before concluding which model fits the best.
+---
+
+<center>
+
+![Charlotte Kostecka](me.jpg "My Picture"){ width=20% }
+
+</center>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries Used
+
+```{r}
+library(ggplot2)
+library(s20x)
+```
+
+
+## My Video
+
+
+
+## Introduction
+
+For this project, I will be using a data set looking at stars that host planets. For many years, a focus of astrophysics research has been finding another planet or object in space that is able to host life. To do this, we need to be able to find planets to investigate. The liklihood of finding a planet orbiting a star is dependent on the metal content of the star [see @center_for_astrostatistics]. As the star's metal content increases, the probability of finding a planet increases significantly. The paper my data set is from [see @Santos_2004] looks specifically at the abundance of beryllium (Be) and lithium (Li) content of stars. The paper was testing the hypothesis that the 39  planet-hosting stars would have higher amounts of these elements than the control sample of 29 stars. For this project, I will be looking solely at the beryllium content. The paper did a linear regression for the planet-hosting and control samples, and compared the results. Overall, it showed a slight increase in beryllium content for planet-hosting stars, but not near as much as they were expecting. The end result was that beryllium content is not an efficient way to determine if a star hosts a planet.
+
+### Dataframe
+
+```{r}
+star <- read.csv("Planet_Host_Stars_Data.csv")
+head(star)
+```
+
+### Plotted Data
+
+```{r}
+g <- ggplot(star, aes(x = Teff, y = logN_Be, color = logN_Li)) + geom_point()
+g <- g + geom_smooth(method = "loess")
+g
+```
+
+### Variables
+
+For each object, this data set contains the following variables:
+
+```{r}
+names(star)
+```
+
+Now let us go into detail about what each variable is:
+
+- Star : star's name (categorical)  
+- Type (categorical)  
+  - 1 : planet-hosting star  
+  - 2 : control sample  
+- T_eff : stellar surface temperature in Kelvin (continuous)
+- logN(Be) : log of the abundance of beryllium scaled to the Sun's abundance (continuous)
+- sig_Be : error of logN(Be) calculated from model-fitting of the observed stellar spectrum (continuous)
+- logN(Be) : log of the abundance of lithium scaled to the Sun's abundance (continuous)
+
+### Problem Statement
+
+Since this paper already found a conclusion, and is comparing two samples from the total data collected instead of creating one regression, you may be wondering how I will be using this data for my project. The question I want to answer is if a linear regression line is the best fit for the beryllium vs. effective temperature graphs, which were used in this paper. While the data appears to be linear in nature, it is worth confirming if a linear line is truly the best option for the regression. This is important information to know and if it is found that a quadratic model is a better fit, then it would be worth redoing the comparison of planet-hosting stars to the comparison stars using a quadratic funtion to see how that effects the conclusions found in Santos et al.. I will be analyzing the data set as a whole and not separating it into planet-hosting and control samples before doing my analysis. 
+
+### My Interest in this Project
+
+I am a double major in math and physics. I am a senior and started taking the first of my two semesters of physics capstone this fall. My physics capstone is research project and I am reducing raw data from quasars into spectra and then using those spectra to analyze if relationships found between the quasars' emissions and outflow properties at low luminosity and redshift still exists at higher luminosity and redshift. This is the first time I have studied anything related to astrophysics, and I have been enjoying what I am learning a lot. Since I've liked it so much, I decided to use this project as an opportunity to work with more astrophysics data. I want to go into data science after finishing my undergraduate degree, so this seemed like the perfect opportuntiy to combine my two interests. 
+
+## Theory of the Analysis
+
+### Simple Linear Regression
+
+Since our data does not follow an equation exactly, there is error associated with it, we must use a probabilistic model. A very common probabilistic model is a simple linear regression (SLR) model. This follows uses the following line of means equation:
+
+$$
+\begin{eqnarray}
+y = \beta_0 + \beta_1x + \epsilon
+\end{eqnarray}
+$$
+In this equation, $\beta_0$ and $\beta_1$ are unknown parameters that create the linear equation we expect to fit the data. The last term of this equation, $\epsilon$, is the error. The average value of this equation, which is $E(y)$, is the regression line we are used to seeing. 
+
+When we use the SLR method, there are 4 assumptions that we expect to be true. The first involves the error. We use the idea that the error is both above and below the line the means, but averages out to 0 ($E(\epsilon) = 0$) [see @MendenhallWilliamM2016Sfea]. This is why when we take the average of the line of means equation, which we expect to be a linear line of form $y = mx + b$, we get the following:
+
+$$
+\begin{eqnarray}
+E(\epsilon) &=& E(\beta_0 + \beta_1x + \epsilon) \\
+&=& \beta_0 + \beta_1x + E(\epsilon) \\
+&=& \beta_0 + \beta_1x
+\end{eqnarray}
+$$
+
+as we want.  
+
+The second assumption we make is that the variance of $\epsilon$ is the same for all values of the independent variable $x$. The third assumtion is that $\epsilon$ is normally distributed. The fourth and final assumtpion is that the errors are independent. The error for one datum has no impact or dependence on the error for another datum. While it is preferred for all 4 assumptions to be true when using SLR, there are many applications where SLR can be used without all 4 being met.
+
+### Method of Least Squares
+
+Now that we know how we are getting our regression, we need to determine how we are going to calculate the unknown parameters $\beta_0$ and $\beta_1$. To do this, we will be using the method of least squares. For this method, our error is the residual, or difference between the predicted value $\hat{y}$ and the true value $y$, which is written as $\epsilon = y - \hat{y}$. For the entire data set, this becomes $(y_i - \hat{y}_i) = [y_i - (\hat{\beta}_0 + \hat{\beta}_1x_i)]$. When we use the method of least squares, our goal is to minimize the square of the residuals. We square the residuals so the positive and negative residuals have the same impact on the calculation. By minimizing the residuals, we are getting our regression line to be as close to all the data points as possible while still being a straight line. The equation for the square of the sum of the deviations (or residuals) is as follows:
+
+$$
+\begin{eqnarray}
+SSE = \sum _{i = 1}^n \left[ y_i - (\hat{\beta}_0 + \hat{\beta}_1x_i) \right] ^2
+\end{eqnarray}
+$$
+We can now use this information to calculate a formula for $\hat{\beta}_0$ and $\hat{\beta}_1$ that means SSE is minimized. After some calculations, we get the following equations. 
+To find the slope of the linear equation, or $\beta_1$ we use the equation:
+
+$$
+\begin{eqnarray}
+\hat{\beta}_1 = \frac{SS_{xy}}{SS_{xx}}
+&=& \frac{\sum xy - \frac{\sum x \sum y}{n}}{\sum x^2 - \frac{(\sum x)^2}{n}}
+\end{eqnarray}
+$$
+
+To find the y-intercept of the linear equation, or $\beta_0$, we use the much simpler equation $\hat{\beta}_0 = \bar{y} - \hat{\beta}_1 \bar{x}$.  
+
+Now that we know the theory behind our regression, we are able to use it. Next we will use this to create a linear  model and quadratic model to determine which is a better fit for our stars data. 
+
+## Estimating the Parameters
+
+### Linear Model
+
+```{r}
+be.lm <- lm(logN_Be ~ Teff, data = star)
+summary(be.lm)
+```
+
+This estimates that for a linear model, we have $\hat{\beta}_0 = -0.8359$ and $\hat{\beta}_1 = 0.0003$. 
+
+### Quadratic Model
+
+```{r}
+be.qd <- lm(logN_Be ~ Teff + I(Teff^2), data = star)
+summary(be.qd)
+```
+
+The quadratic model estimates that for the equation $\hat{y}_i = \hat{\beta}_0 + \hat{\beta}_1 x_i + \hat{\beta}_2 x_i^2$, we have $\hat{\beta}_0 = -1.915*10^1$, $\hat{\beta}_1 = 6.825*10^{-3}$, and $\hat{\beta}_2 = -5.781*10^{-7}$. 
+
+Now that we have calculated the variables for the two models, we must test them to determine which one fits the data better. 
+
+## Testing the Linear Model 
+
+### Trendline
+
+First, let us plot the data with the line of best fit. 
+
+```{r}
+plot(x = star$Teff, y = star$logN_Be, bg = "Purple", pch = 21, cex = 1.2, main = "Scatter Plot and Trendline", xlab = "Teff", ylab = "logN_Be", ylim = c(-0.25, 1.5), xlim = c(4800, 6400))
+
+abline(be.lm)
+```
+
+While a linear line appears to fit the data, the regression line itself does not seem to fit the data well. It appears that there are outliers in the mid to high Teff region that are are making the regression line seem inaccurate. This must be investigated more. 
+
+### Plot of Residuals
+
+To investigate the fit of the linear model, the first step is to look at the residuals. This is a measurement of how far the data points are from the predicted value from the model's line of best fit. On the plot below, the verticle lines stretching from the data to the regression line represent the residuals and how they are calculated. 
+
+```{r}
+plot(x = star$Teff, y = star$logN_Be, bg = "Purple", pch = 21, cex = 1.2, main = "Plot of Residuals (RSS)", xlab = "Teff", ylab = "logN_Be", ylim = c(-0.25, 1.5), xlim = c(4800, 6400))
+
+abline(be.lm)
+y_hat <- fitted(be.lm)
+with(star, (segments(Teff, logN_Be, Teff, y_hat, col = "deeppink")))
+```
+
+### Plot of Means
+
+The second thing to look at is the plot of means. This is the difference between the predicted y-values and the mean y-value of all the data points. These differences are calculated for every data point in the set and are visualized as the blue lines on the plot below. 
+
+```{r}
+plot(x = star$Teff, y = star$logN_Be, bg = "Purple", pch = 21, cex = 1.2, main = "Plot of Means (MSS)", xlab = "Teff", ylab = "logN_Be", ylim = c(-0.25, 1.5), xlim = c(4800, 6400))
+
+abline(be.lm)
+y_hat <- fitted(be.lm)
+with(star, abline(h = mean(logN_Be)))
+with(star, segments(Teff, mean(logN_Be), Teff, y_hat, col = "Blue"))
+```
+
+### Plot of Total Deviation
+
+The final aspect we want to look at is the total deviation. This is the measure of how far the data is from the mean y-value. The TSS is the last piece we need to calculate the linear model's $R^2$ value, a measure of how well the regression line fits the data. This is represented by the green lines on the plot below. 
+
+```{r}
+plot(x = star$Teff, y = star$logN_Be, bg = "Purple", pch = 21, cex = 1.2, main = "Plot of Total Deviation (TSS)", xlab = "Teff", ylab = "logN_Be", ylim = c(-0.25, 1.5), xlim = c(4800, 6400))
+
+y_hat <- fitted(be.lm)
+with(star, abline(h = mean(logN_Be)))
+with(star, segments(Teff, mean(logN_Be), Teff, logN_Be, col = "green"))
+```
+
+### Calculating $R^2$ 
+
+We are now ready to calculate the $R^2$ value for the linear model. 
+
+```{r}
+RSS <- with(star, sum((logN_Be - y_hat)^2))
+MSS <- with(star, sum((y_hat - mean(logN_Be))^2))
+TSS <- with(star, sum((logN_Be - mean(logN_Be))^2))
+R2 <- MSS/TSS
+
+cat("RSS:", RSS, "\nMSS:", MSS, "\nTSS:", TSS , "\nR^2:", R2)
+
+```
+
+The $R^2$ is a measurement of how well the model fits the data. It is often shown as a decimal or percentage, since the minumum and maximum values it can take are 0 and 1 (or 100%), respectively. For our linear model, the $R^2$ value is 0.1028. This means that 10.28% of the variance in logN_Be is explained by the linear model. Since a good $R^2$ value is as close to 100% as possible, this is not a good value and shows that the linear model does not fit the data well. This can be for many reasons, such as a quadratic or other model fitting better, or can be due to outliers in the data itself. 
+
+### Lowess Smoother Scatter Plot
+
+```{r}
+trendscatter(logN_Be ~ Teff, f = 0.5, data = star, main = "Lowess Smoother Scatter Plot of logN_Be vs. Teff")
+```
+
+The lowess smoother scatter plot shows a mostly straight line that curves at around Teff = 6000 K. The red lines show the region where the best fit line is most likely to be found. For this dataset, the lines are reasonably close together. 
+
+### Variables for Plots
+
+```{r}
+be2.lm <- with(star, be.lm)
+log.res <- residuals(be2.lm)
+log.fit <- fitted(be2.lm)
+```
+
+### Plot of Residuals vs. Teff
+
+```{r}
+plot(x = star$Teff, y = log.res, xlab = "Teff", ylab = "Residuals", main = "Plot of Residuals vs. Teff", ylim = c(-1.1*max(log.res), 1.1*max(log.res)))
+
+abline(h = mean(log.res))
+```
+
+The points are symmetrical about the y-axis. The horizontal line is the mean of the residuals and is at about 0. This shows that the mean value of $\epsilon$ is 0, which is what we want to see. 
+
+### Plot of Residuals vs. Fitted Values
+
+```{r}
+trendscatter(log.res ~ log.fit, f = 0.5, data = be2.lm, xlab = "Fitted Values", ylab = "Residuals", main = "Residuals vs. Fitted Values", ylim = c(-1.1*max(log.res), 1.1*max(log.res)))
+```
+
+As with the previous plot, the residuals are mostly centered around 0. 
+
+### Check for Normality
+
+```{r}
+normcheck(be2.lm, shapiro.wilk = TRUE)
+```
+
+We are using the Shaprio-Wilk test to look for normality. Our null hypothesis is that the residuals are normally distributed. To see if we can reject the null hypothesis, we are comparing the test statistic to 0.05. When we run the test, the test statistic, the p-value, is 0. This means we must reject the null hypothesis, and with 95% confidence we can say that for the linear model, the error is not distributed normally. 
+
+## Testing the Quadratic Model
+
+As we have seen above, there are many issues with the linear model for the planet host stars data. Let us now try a quadratic model to determine if this model fits the data more accurately. 
+
+```{r}
+quad.f <- function(x){
+  be.qd$coefficients[1] + be.qd$coefficients[2]*x + be.qd$coefficients[3]*x^2
+}
+```
+
+### Trendline 
+
+```{r}
+plot(x = star$Teff, y = star$logN_Be, bg = "blue", pch = 21, cex = 1.2, main = "Scatter Plot and Trendline", xlab = "Teff", ylab = "logN_Be", ylim = c(-0.25, 1.5), xlim = c(4800, 6400))
+
+curve(quad.f, lwd = 2, add = TRUE)
+```
+
+### Plot of Residuals (RSS)
+
+```{r}
+plot(x = star$Teff, y = star$logN_Be, bg = "blue", pch = 21, cex = 1.2, main = "Plot of Residuals (RSS)", xlab = "Teff", ylab = "logN_Be", ylim = c(-0.25, 1.5), xlim = c(4800, 6400))
+
+curve(quad.f, add = TRUE)
+q_hat <- fitted(be.qd)
+with(star, (segments(Teff, logN_Be, Teff, q_hat, col = "deeppink")))
+```
+
+As with the linear model, the pink lines on the above plot represent the distance from the data to the quadratic model, also known as the resdiuals. 
+
+### Plot of Means
+
+```{r}
+plot(x = star$Teff, y = star$logN_Be, bg = "blue", pch = 21, cex = 1.2, main = "Plot of Means (MSS)", xlab = "Teff", ylab = "logN_Be", ylim = c(-0.25, 1.5), xlim = c(4800, 6400))
+
+curve(quad.f, add = TRUE)
+with(star, abline(h = mean(logN_Be)))
+with(star, (segments(Teff, mean(logN_Be), Teff, q_hat, col = "blue")))
+```
+
+In the plot above, the blue lines stretch from the mean logN_Be to the quadratic best fit. 
+
+### Plot of Total Deviation
+
+```{r}
+plot(x = star$Teff, y = star$logN_Be, bg = "blue", pch = 21, cex = 1.2, main = "Plot of Total Deviation (TSS)", xlab = "Teff", ylab = "logN_Be", ylim = c(-0.25, 1.5), xlim = c(4800, 6400))
+
+with(star, abline(h = mean(logN_Be)))
+with(star, (segments(Teff, mean(logN_Be), Teff, logN_Be, col = "green")))
+```
+
+In the plot above, the green lines represent how far the data is from the mean logN_Be. Since the calculation for TSS does not use the line of best fit, it looks the same and has the same value as  we calculated TSS for the linear model. 
+
+### Calculating $R^2$ 
+
+Now we want to calculate the $R^2$ value for the fit of the quadratic model and compare this to the $R^2$ of the linear model. 
+
+```{r}
+RSS <- with(star, sum((logN_Be - q_hat)^2))
+MSS <- with(star, sum((q_hat - mean(logN_Be))^2))
+TSS <- with(star, sum((logN_Be - mean(logN_Be))^2))
+R2 <- MSS/TSS
+
+cat("RSS:", RSS, "\nMSS:", MSS, "\nTSS:", TSS , "\nR^2:", R2)
+```
+
+This gives us an $R^2$ value of 0.1668 (16.68%) for the quadratic model. In other words, 16.68% of the variability in logN_Be is explained by this quadratic model. This is about 0.06 (6%) better than the $R^2$ for the linear model, but is still quite low. This shows that the quadratic model is not a good fit for the data either. Later in this document, after looking in more detail at the quadratic model, we will remove outliers from the data and investigate how that alters the models. 
+
+### Variables for Plots
+
+```{r}
+be2.qd <- with(star, be.qd)
+qd.res <- residuals(be2.qd)
+qd.fit <- fitted(be2.qd)
+```
+
+### Plot of Residuals vs. Teff
+
+```{r}
+plot(x = star$Teff, y = qd.res, xlab = "Teff", ylab = "Residuals", main = "Plot of Residuals vs. Teff", ylim = c(-1.1*max(qd.res), 1.1*max(qd.res)))
+
+abline(h = mean(qd.res))
+```
+
+As with the linear model, the residuals for the quadratic model are centered around 0. This means that the mean $\epsilon$ is roughly 0, which is what we are looking for. On the plot above, the mean of the residuals is represented by the horizontal lines.
+
+### Plot of Residuals vs. Fitted Values
+
+```{r}
+trendscatter(qd.res ~ qd.fit, f = 0.5, data = be2.qd, xlab = "Fitted Values", ylab = "Residuals", main = "Residuals vs. Fitted Values", ylim = c(-1.1*max(qd.res), 1.1*max(qd.res)))
+```
+
+As before, the residuals are mostly focused around 0. 
+
+### Check for Normality
+
+```{r}
+normcheck(be2.qd, shapiro.wilk = TRUE)
+```
+
+For the Shapiro-Wilk test, our null hypothesis is that the resuduals are distributed normally. The p-value from this test is 0, which is less than our comparison value of 0.05. Thus we can reject the null hypothesis, so the quadratic model's error is not distributed normally. 
+
+### Cook's Distance Plots
+
+Since neither of the models fit the data well, even though the variables appear to have a linear correlation, we need to see if there are outliers causing the models to be inaccurate. To do this, we look at the Cook's distance plot, which measures how much each data point effects the model. We can then remove the points that have a greater effect on the models, re-apply the models, and see if they are more accurate. 
+
+```{r}
+cooks20x(be.lm, main = "Linear Model Cook's Distance Plot")
+cooks20x(be.qd, main = "Quadratic Model Cook's Distance Plot")
+```
+
+We can see that observations 23, 29, and 52 have the largest effect on the linear model. Observations 23, 29, and 32 have the largest effect on the quadratic model. Since observations 23 and 29 have large effects on both the linear and quadratic models, these two points will both be removed and the linear and quadratic regression models will be applied again. The new $R^2$ values will be discussed and compared. 
+
+```{r}
+star2 <- star[-c(23, 29),]
+```
+
+#### Linear Model
+
+```{r}
+lin2 <- lm(logN_Be ~ Teff, data = star2)
+summary(lin2)
+```
+
+```{r}
+plot(x = star2$Teff, y = star2$logN_Be, bg = "Purple", pch = 21, cex = 1.2, main = "Scatter Plot and Trendline w/ Points Removed", xlab = "Teff", ylab = "logN_Be", ylim = c(-0.25, 1.5), xlim = c(4800, 6400))
+
+abline(lin2)
+```
+
+With the outliers removed, the linear model's $R^2$ has almost tripled and is now 0.3021 (30.21%). While the line still does not appear to fit the data very well, it fits significantly better than the linear model before the points were removed. Now we can compare this to the effects this had on the quadratic model.
+
+#### Quadratic Model
+
+```{r}
+quad2 <- lm(logN_Be ~ Teff + I(Teff^2), data = star2)
+summary(quad2)
+```
+
+```{r}
+plot(x = star2$Teff, y = star2$logN_Be, bg = "blue", pch = 21, cex = 1.2, main = "Scatter Plot and Trendline w/ Points Removed", xlab = "Teff", ylab = "logN_Be", ylim = c(-0.25, 1.5), xlim = c(4800, 6400))
+
+quad2.f <- function(x){
+  quad2$coefficients[1] + quad2$coefficients[2]*x + quad2$coefficients[3]*x^2
+}
+curve(quad2.f, lwd = 2, add = TRUE)
+```
+
+The new quadratic regression appears more similar to a linear line than the previous quadratic regression from the full data set. As with the second linear model, this quadratic model fits significantly better than the previous. The new $R^2$ value is 0.3042 (30.42%), which is about double the value of the previous quadratic model's. 
+
+## Conclusion & Reslults
+
+From the analysis, we can conclude that with the data unmanipulated, neither the linear nor quadratic models are good fits. Both of the models' $R^2$ values are less than 0.2, although the quadratic model does have a higher $R^2$ than the linear model. After using a Cook's Distance Plot to determine which points impact the regression the most, it can be seen that there are two points that have high impact on both of the models. These two points were removed from the data set, and the regressions run on the new data set. When doing this, the linear and quadratic models fit the data much better than when the data points had not been removed. The regressions had near equal $R^2$ values at about 0.3. These new values are roughly triple the original linear model's and double the original quadratic model's $R^2$ values.  
+
+We can use this information to say that at this point, neither the linear nor quadratic model fit the data well. To truly determine the best fit, the data points should be looked at more to determine if there are any outliers not detected by Cook's Distance Plot. From a visual understanding of the raw data's scatterplot, it appears that a linear line fits the graph the best. But, the analysis has shown that this is inconclusive. More analysis must be done, and possibly more models besides linear and quadratic considered, before reaching a conclusion about the best model for this data set.  
+
+The last, and most important, part of this project is to put these conclusions into the words of the problem. From this analysis, the best model to analyze the relationship between effective temperature and beryllium abundance of stars is not the linear regression used in the paper [see @Santos_2004]. At the same time, neither is a quadratic model. Since the data looks to be linear, but the linear regression does not appear to match the data well due to points with a significantly lower than expected beryllium content, more investigation must be done than in this project to determine which points can be removed while still keeping the accuracy of the study. The paper by Santos et al. did remove points when they did their regression for multiple different reasons, which gave them a more accurate regression to answer their research question. But again, these reasons are more complicated and physics-heavy than can be accomplished in this project. So to match a regression model to the total data set, with no points removed, a linear or quadratic model are not the best fits. 
+
+## References
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
